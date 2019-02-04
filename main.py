@@ -76,6 +76,39 @@ def deleteTestData(df):
     return df
 
 
+def cleanData(df):
+
+    # TODO: need to change col names back to legacy col names, because
+    # col name mapping is now done last
+
+    # Remove commas from ~12 last names
+    df.loc[(df['last_name'].str.contains(',', na=False)) & (df['last_name'] != 'F. Queen, Jr.'),'Last Name'] = df['last_name'].str.replace(',', '')
+
+    # Delete address fields that are just commas
+    df.loc[(df['address1'] == ', '), 'address1'] = np.nan
+    df.loc[(df['address1'] == ','), 'address1'] = np.nan
+
+    # Lower case some city names
+    df.loc[df['city'].str.match('^.*[A-Z]$', na=False), 'city'] = df['city'].str.title()
+
+    # Manually fix some city names
+    df.loc[df['city'] == 'St. Mary&#039;s Ward', 'city'] = "St. Mary's Ward"
+
+    # Replace seven "0" phone numbers with nan
+    # TODO: change this to regex, there are 0000 etc too
+    # df.loc[df['Home Phone'] == '0', 'Home Phone'] = np.nan
+
+    return df
+
+
+def outputMultiChoiceLists(df, meta):
+    customFields = list(meta.loc[meta['Custom Field Type?'] == 'Multiple Choice', 'fullColName'])
+    for col in customFields:
+        customFieldValues = pd.DataFrame(df[col].unique()).dropna()
+        customFieldValues.columns = ['VALUES']
+        customFieldValues.to_csv('customFieldValues/' + col + '.csv', index=False)
+
+
 def mapColumns(df, meta):
 
     # Get a dictionary of our two meta data columns (orig name, NB name)
@@ -103,36 +136,6 @@ def mapColumns(df, meta):
     return df
 
 
-def cleanData(df):
-
-    # Remove commas from ~12 last names
-    df.loc[(df['last_name'].str.contains(',', na=False)) & (df['last_name'] != 'F. Queen, Jr.'),'Last Name'] = df['last_name'].str.replace(',', '')
-
-    # Delete address fields that are just commas
-    df.loc[(df['address1'] == ', '), 'address1'] = np.nan
-    df.loc[(df['address1'] == ','), 'address1'] = np.nan
-
-    # Lower case some city names
-    df.loc[df['city'].str.match('^.*[A-Z]$', na=False), 'city'] = df['city'].str.title()
-
-    # Manually fix some city names
-    df.loc[df['city'] == 'St. Mary&#039;s Ward', 'city'] = "St. Mary's Ward"
-
-    # Replace seven "0" phone numbers with nan
-    # TODO: change this to regex, there are 0000 etc too
-    # df.loc[df['Home Phone'] == '0', 'Home Phone'] = np.nan
-
-    return df
-
-
-def outputMultiChoiceLists(df, meta):
-    customFields = list(meta.loc[meta['Custom Field Type?'] == 'Multiple Choice', 'NB TARGET FIELD'])
-    for col in customFields:
-        customFieldValues = pd.DataFrame(df[col].unique()).dropna()
-        customFieldValues.columns = ['VALUES']
-        customFieldValues.to_csv('customFieldValues/' + col + '.csv', index=False)
-
-
 def outputData(df):
 
     df.to_csv(CONFIG['OUTPUT_FILENAME'], index=False)
@@ -148,11 +151,13 @@ def run():
     df = filterToInscopeColumns(df, meta)
     df = deleteTestData(df)
 
-    df = mapColumns(df, meta)
-
     outputMultiChoiceLists(df, meta)
 
     df = cleanData(df)
+
+    df = mapColumns(df, meta)
+
+
 
     outputData(df)
 
