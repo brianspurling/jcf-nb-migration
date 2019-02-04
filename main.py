@@ -1,7 +1,35 @@
 import pandas as pd
 import numpy as np
+import json
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 from config import CONFIG
+
+
+def loadMetaDataFromGSheet():
+    _client = gspread.authorize(
+        ServiceAccountCredentials.from_json_keyfile_name(
+            CONFIG['GOOGLE_API_KEY_FILE'],
+            CONFIG['GOOGLE_API_SCOPE']))
+    conn = _client.open(CONFIG['META_DATA_GSHEET_NAME'])
+
+    stm = None
+    for ws in conn.worksheets():
+        if ws.title == 'STM':
+            stm = ws
+            break
+
+    meta = pd.read_json(json.dumps(stm.get_all_records()))
+
+    meta.to_csv(CONFIG['META_DATA_TMP_FILENAME'], index=False)
+
+    return meta
+
+
+def loadMetaDataFromTempFile():
+    meta = pd.read_csv(CONFIG['META_DATA_TMP_FILENAME'])
+    return meta
 
 
 def loadData():
@@ -17,12 +45,16 @@ def loadData():
     return df
 
 
-def filterToInscopeColumns(df):
+def filterToInscopeColumns(df, meta):
     # Some of the column names have carriage returns in, which
     # is a problem for matching to our list of in-scope columns.
     allCols = df.columns.str.replace('\n', '')
     df.columns = allCols
-    df = df[CONFIG['INSCOPE_COLUMNS']]
+
+    # Our meta data has a "IN SCOPE" column, T or F
+    inScopeCols = meta.loc[meta['IN SCOPE'] == 'T', 'fullColName']
+    df = df[list(inScopeCols)]
+
     return df
 
 
@@ -44,34 +76,54 @@ def deleteTestData(df):
     return df
 
 
+def mapColumns(df, meta):
+
+    # Get a dictionary of our two meta data columns (orig name, NB name)
+
+    mapping = {}
+    targetColList = []
+    for i, row in meta.iterrows():
+        if row['IN SCOPE'] == 'T':
+            mappedValue = row['NB TARGET FIELD']
+            if row['NB TARGET FIELD'] is np.nan:
+                mappedValue = 'NOT MAPPED - ' + str(i)
+
+            if mappedValue in targetColList:
+                mapping[row['fullColName']] = mappedValue + ' - ' + str(i)
+            else:
+                mapping[row['fullColName']] = mappedValue
+
+            targetColList.append(mappedValue)
+
+    df.rename(
+        index=str,
+        columns=mapping,
+        inplace=True)
+
+    return df
+
+
 def cleanData(df):
 
     # Remove commas from ~12 last names
-    df.loc[(df['Last Name'].str.contains(',', na=False)) & (df['Last Name'] != 'F. Queen, Jr.'),'Last Name'] = df['Last Name'].str.replace(',', '')
+    df.loc[(df['last_name'].str.contains(',', na=False)) & (df['last_name'] != 'F. Queen, Jr.'),'Last Name'] = df['last_name'].str.replace(',', '')
 
     # Delete address fields that are just commas
-    df.loc[(df['Address 1'] == ', '), 'Address 1'] = np.nan
-    df.loc[(df['Address 1'] == ','), 'Address 1'] = np.nan
+    df.loc[(df['address1'] == ', '), 'address1'] = np.nan
+    df.loc[(df['address1'] == ','), 'address1'] = np.nan
 
     # Lower case some city names
-    df.loc[df['City'].str.match('^.*[A-Z]$', na=False), 'City'] = df['City'].str.title()
+    df.loc[df['city'].str.match('^.*[A-Z]$', na=False), 'city'] = df['city'].str.title()
 
     # Manually fix some city names
-    df.loc[df['City'] == 'St. Mary&#039;s Ward', 'City'] = "St. Mary's Ward"
+    df.loc[df['city'] == 'St. Mary&#039;s Ward', 'city'] = "St. Mary's Ward"
 
     # Replace seven "0" phone numbers with nan
     # TODO: change this to regex, there are 0000 etc too
-    df.loc[df['Home Phone'] == '0', 'Home Phone'] = np.nan
+    # df.loc[df['Home Phone'] == '0', 'Home Phone'] = np.nan
 
     return df
 
-
-def mapColumns(df):
-    df.rename(
-        index=str,
-        columns=CONFIG['COLUMN_MAPPINGS'],
-        inplace=True)
-    return df
 
 
 
@@ -83,11 +135,14 @@ def outputData(df):
 
 def run():
 
+    # meta = loadMetaDataFromGSheet()
+    meta = loadMetaDataFromTempFile()
+
     df = loadData()
-    df = filterToInscopeColumns(df)
+    df = filterToInscopeColumns(df, meta)
     df = deleteTestData(df)
 
-    df = cleanData(df)
+    df = mapColumns(df, meta)
 
     df = mapColumns(df)
 
