@@ -125,6 +125,12 @@ def cleanData(df):
     return df
 
 
+def outputMultiChoiceLists(df, meta):
+    customFields = list(meta.loc[meta['Custom Field Type?'] == 'Multiple Choice', 'NB TARGET FIELD'])
+    for col in customFields:
+        customFieldValues = pd.DataFrame(df[col].unique()).dropna()
+        customFieldValues.columns = ['VALUES']
+        customFieldValues.to_csv('customFieldValues/' + col + '.csv', index=False)
 
 
 def outputData(df):
@@ -144,7 +150,9 @@ def run():
 
     df = mapColumns(df, meta)
 
-    df = mapColumns(df)
+    outputMultiChoiceLists(df, meta)
+
+    df = cleanData(df)
 
     outputData(df)
 
