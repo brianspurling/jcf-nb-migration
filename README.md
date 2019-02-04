@@ -11,5 +11,5 @@ system's data in the same directory, set the values in `config.py` accordingly,
 set up the Google Sheet, and run python `main.py` from the command line
 
 To set up the Google Sheet you need a Google API key file in the directory (set
-the filename in `config.py`. The Google Sheet must be shared to the API
-account. 
+the filename in `config.py`). The Google Sheet must be shared to the API
+account.
