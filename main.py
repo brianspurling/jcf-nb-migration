@@ -171,6 +171,28 @@ def outputMultiChoiceLists(df, meta):
                                  col + '.csv', index=False)
 
 
+def processTags(df, meta):
+    df_tagMapping = meta.loc[(meta['Tag?'] == 'T') & (meta['IN SCOPE'] == 'T'), ['fullColName', 'Tag Name']]
+    tagMapping = df_tagMapping.set_index('fullColName')['Tag Name'].to_dict()
+
+    # Add a tag column containing an empty list for every row, then loop
+    # through the tagMapping. The tag mapping is a dictionary of column names
+    # and tag values. The presence of a column name in the tag mapping
+    # indicates that any row where this column is populated should be assigned
+    # the tag. Note that multiple columns can be used for the same tag, so
+    # we need to avoid creating duplicate tags
+    df['tags'] = [[]] * len(df)
+    for colName in tagMapping:
+        for i, row in df.loc[df[colName].notna()].iterrows():
+            # There's probably a more pythonic/vectorised way to do this, but
+            # I had troube getting this working so am leaving it be. The key
+            # was the .copy()
+            list = row['tags'].copy()
+            if tagMapping[colName] not in list:
+                list.append(tagMapping[colName])
+            df.at[i, 'tags'] = list
+
+    return df
 
 
 def mapColumns(df, meta):
@@ -226,9 +248,9 @@ def run(args):
 
     df = cleanData(df)
 
+    df = processTags(df, meta)
+
     df = mapColumns(df, meta)
-
-
 
     outputData(df)
 
