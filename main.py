@@ -1,5 +1,10 @@
 import pandas as pd
 import numpy as np
+import sys
+import argparse
+import os
+import tempfile
+import shutil
 import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -7,7 +12,61 @@ from oauth2client.service_account import ServiceAccountCredentials
 from config import CONFIG
 
 
-def loadMetaDataFromGSheet():
+def processArgs(args):
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--meta',
+        help='get the latest metadata from the Source To Target Mapping doc',
+        action='store_true')
+    args = parser.parse_args()
+
+    # Set default options, then edit based on command line args
+    options = {
+        'LOAD_METADATA_FROM_GSHEET': False}
+
+    if args.meta:
+        options['LOAD_METADATA_FROM_GSHEET'] = True
+
+    return options
+
+
+def setup():
+
+    # Check source data is there
+    if not os.path.isfile(CONFIG['DATA_DIRECTORY'] + '/' +
+                          CONFIG['INPUT_FILENAME']):
+        raise ValueError('Failed to find the input data file. I expected to ' +
+                         'find it in the same directory as the code, ' +
+                         'named: ' + CONFIG['DATA_DIRECTORY'] + '/' +
+                         CONFIG['INPUT_FILENAME'] + '. Either ' +
+                         'add the file to the directory, or change the ' +
+                         'expected file name in config.py')
+
+    # Check Google API key is there
+    if not os.path.isfile(CONFIG['GOOGLE_API_KEY_FILE']):
+        raise ValueError('Failed to find the Google API key file. I ' +
+                         'expected to find it in the same directory as the ' +
+                         'code, named: ' + CONFIG['GOOGLE_API_KEY_FILE'] +
+                         '. Either add the file to the directory, or ' +
+                         'change the expected file name in config.py. ' +
+                         'Read more about Google API Keys here: ' +
+                         'https://developers.google.com/sheets/api/' +
+                         'guides/authorizing')
+
+    # Create/replace directory for custom field lists (this is the really
+    # robust method fof deleting and creating a directory
+    path = CONFIG['DATA_DIRECTORY'] + '/' + CONFIG['CUSTOM_FIELDS_DIRECTORY']
+    if (os.path.exists(path)):
+        tmp = tempfile.mktemp(
+            dir=os.path.dirname(path))
+        shutil.move(path, tmp)  # rename
+        shutil.rmtree(tmp)  # delete
+    os.makedirs(path)  # create the new folder
+
+
+def loadMetadataFromGSheet():
+    print('Connecting to Google Sheets')
     _client = gspread.authorize(
         ServiceAccountCredentials.from_json_keyfile_name(
             CONFIG['GOOGLE_API_KEY_FILE'],
@@ -22,19 +81,20 @@ def loadMetaDataFromGSheet():
 
     meta = pd.read_json(json.dumps(stm.get_all_records()))
 
-    meta.to_csv(CONFIG['META_DATA_TMP_FILENAME'], index=False)
+    meta.to_csv(CONFIG['DATA_DIRECTORY'] + '/' + CONFIG['META_DATA_TMP_FILENAME'], index=False)
 
     return meta
 
 
 def loadMetaDataFromTempFile():
-    meta = pd.read_csv(CONFIG['META_DATA_TMP_FILENAME'])
+    meta = pd.read_csv(CONFIG['DATA_DIRECTORY'] + '/' +
+                       CONFIG['META_DATA_TMP_FILENAME'])
     return meta
 
 
 def loadData():
     df = pd.read_csv(
-        CONFIG['INPUT_FILENAME'],
+        CONFIG['DATA_DIRECTORY'] + '/' + CONFIG['INPUT_FILENAME'],
         low_memory=False,
         dtype={'Work Phone': 'object'})
 
@@ -82,7 +142,7 @@ def cleanData(df):
     # col name mapping is now done last
 
     # Remove commas from ~12 last names
-    df.loc[(df['last_name'].str.contains(',', na=False)) & (df['last_name'] != 'F. Queen, Jr.'),'Last Name'] = df['last_name'].str.replace(',', '')
+    df.loc[(df['last_name'].str.contains(',', na=False)) & (df['last_name'] != 'F. Queen, Jr.'), 'Last Name'] = df['last_name'].str.replace(',', '')
 
     # Delete address fields that are just commas
     df.loc[(df['address1'] == ', '), 'address1'] = np.nan
@@ -106,7 +166,11 @@ def outputMultiChoiceLists(df, meta):
     for col in customFields:
         customFieldValues = pd.DataFrame(df[col].unique()).dropna()
         customFieldValues.columns = ['VALUES']
-        customFieldValues.to_csv('customFieldValues/' + col + '.csv', index=False)
+        customFieldValues.to_csv(CONFIG['DATA_DIRECTORY'] + '/' +
+                                 CONFIG['CUSTOM_FIELDS_DIRECTORY'] + '/' +
+                                 col + '.csv', index=False)
+
+
 
 
 def mapColumns(df, meta):
@@ -138,14 +202,21 @@ def mapColumns(df, meta):
 
 def outputData(df):
 
-    df.to_csv(CONFIG['OUTPUT_FILENAME'], index=False)
+    df.to_csv(CONFIG['DATA_DIRECTORY'] + '/' +
+              CONFIG['OUTPUT_FILENAME'], index=False)
     print("Saved data to " + CONFIG['OUTPUT_FILENAME'])
 
 
-def run():
+def run(args):
 
-    # meta = loadMetaDataFromGSheet()
-    meta = loadMetaDataFromTempFile()
+    opts = processArgs(args)
+
+    setup()
+
+    if opts['LOAD_METADATA_FROM_GSHEET']:
+        meta = loadMetadataFromGSheet()
+    else:
+        meta = loadMetaDataFromTempFile()
 
     df = loadData()
     df = filterToInscopeColumns(df, meta)
@@ -162,4 +233,5 @@ def run():
     outputData(df)
 
 
-run()
+if __name__ == "__main__":
+    run(sys.argv[1:])
