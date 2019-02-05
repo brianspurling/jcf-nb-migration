@@ -54,12 +54,20 @@ def setup():
     # Create/replace directory for custom field lists (this is the really
     # robust method fof deleting and creating a directory
     path = CONFIG['DATA_DIRECTORY'] + '/' + CONFIG['CUSTOM_FIELDS_DIRECTORY']
-    if (os.path.exists(path)):
+    if os.path.exists(path):
         tmp = tempfile.mktemp(
             dir=os.path.dirname(path))
         shutil.move(path, tmp)  # rename
         shutil.rmtree(tmp)  # delete
     os.makedirs(path)  # create the new folder
+
+    # Check whether the meta data text file exists and, if it doesn't,
+    # warn that it needs to be created
+    path = CONFIG['DATA_DIRECTORY'] + '/' + CONFIG['META_DATA_TMP_FILENAME']
+    if not os.path.isfile(path):
+        print('Did not find a meta data text file (' + path + '). The first ' +
+              'time you run the pipeline use the `--meta` argument to pull ' +
+              'the latest meta data from the Google Sheet')
 
 
 def loadMetadataFromGSheet():
