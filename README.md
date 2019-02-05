@@ -39,3 +39,7 @@ This section assumes you don't already have Python installed. Run `$ python --ve
 
 ## Upload the outputted file to NationBuilder
 * ...
+
+# Multiple Choice List Outputs
+
+After the script has run there will be a set of csv files produced (in a directory like root/data/customFieldValues). These are the unique set of values for every column that is intended to be mapped to a multiple choice custom field in NationBuilder. These need entering into NationBuilder manually. 
