@@ -16,32 +16,29 @@ def processArgs(args):
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        '--setup',
+        help="Only run the setup process - doesn't load any data",
+        action='store_true')
+    parser.add_argument(
         '--meta',
-        help='get the latest metadata from the Source To Target Mapping doc',
+        help='Get the latest metadata from the Source To Target Mapping doc',
         action='store_true')
     args = parser.parse_args()
 
     # Set default options, then edit based on command line args
     options = {
-        'LOAD_METADATA_FROM_GSHEET': False}
+        'LOAD_METADATA_FROM_GSHEET': False,
+        'ONLY_RUN_SETUP': False}
 
     if args.meta:
         options['LOAD_METADATA_FROM_GSHEET'] = True
+    if args.setup:
+        options['ONLY_RUN_SETUP'] = True
 
     return options
 
 
 def setup():
-
-    # Check source data is there
-    if not os.path.isfile(CONFIG['DATA_DIRECTORY'] + '/' +
-                          CONFIG['INPUT_FILENAME']):
-        raise ValueError('Failed to find the input data file. I expected to ' +
-                         'find it in the same directory as the code, ' +
-                         'named: ' + CONFIG['DATA_DIRECTORY'] + '/' +
-                         CONFIG['INPUT_FILENAME'] + '. Either ' +
-                         'add the file to the directory, or change the ' +
-                         'expected file name in config.py')
 
     # Check Google API key is there
     if not os.path.isfile(CONFIG['GOOGLE_API_KEY_FILE']):
@@ -93,6 +90,17 @@ def loadMetaDataFromTempFile():
 
 
 def loadData():
+
+    # Check source data is there
+    if not os.path.isfile(CONFIG['DATA_DIRECTORY'] + '/' +
+                          CONFIG['INPUT_FILENAME']):
+        raise ValueError('Failed to find the input data file. I expected to ' +
+                         'find it in the same directory as the code, ' +
+                         'named: ' + CONFIG['DATA_DIRECTORY'] + '/' +
+                         CONFIG['INPUT_FILENAME'] + '. Either ' +
+                         'add the file to the directory, or change the ' +
+                         'expected file name in config.py')
+
     df = pd.read_csv(
         CONFIG['DATA_DIRECTORY'] + '/' + CONFIG['INPUT_FILENAME'],
         low_memory=False,
@@ -237,6 +245,9 @@ def run(args):
     opts = processArgs(args)
 
     setup()
+
+    if opts['ONLY_RUN_SETUP']:
+        sys.exit()
 
     if opts['LOAD_METADATA_FROM_GSHEET']:
         meta = loadMetadataFromGSheet()
