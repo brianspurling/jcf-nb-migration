@@ -192,6 +192,9 @@ def processTags(df, meta):
                 list.append(tagMapping[colName])
             df.at[i, 'tags'] = list
 
+    df['tags'] = df['tags'].apply(lambda x: ','.join(map(str, x)))
+
+
     return df
 
 
@@ -246,7 +249,7 @@ def run(args):
 
     outputMultiChoiceLists(df, meta)
 
-    df = cleanData(df)
+    # df = cleanData(df)
 
     df = processTags(df, meta)
 
