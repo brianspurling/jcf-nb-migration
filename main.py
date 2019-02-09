@@ -115,6 +115,11 @@ def loadData(meta):
         low_memory=False,
         dtype={'Work Phone': 'object'})
 
+    # Some of the column names have carriage returns in, which
+    # is a problem for matching to our list of in-scope columns.
+    allCols = df.columns.str.replace('\n', '')
+    df.columns = allCols
+
     expectedSize = (CONFIG['EXPECTED_ROW_COUNT'], CONFIG['EXPECTED_COL_COUNT'])
     if df.shape != expectedSize:
         print("ERROR: Size of dataset has changed! Expecting " +
@@ -155,10 +160,6 @@ def loadData(meta):
 
 
 def filterToInscopeColumns(df, meta):
-    # Some of the column names have carriage returns in, which
-    # is a problem for matching to our list of in-scope columns.
-    allCols = df.columns.str.replace('\n', '')
-    df.columns = allCols
 
     # Our meta data has a "IN SCOPE" column, T or F
     inScopeCols = meta.loc[meta['IN SCOPE'] == 'T', 'fullColName']
