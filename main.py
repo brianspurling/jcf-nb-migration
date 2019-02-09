@@ -7,6 +7,7 @@ import tempfile
 import shutil
 import json
 import gspread
+import csv
 from oauth2client.service_account import ServiceAccountCredentials
 
 from config import CONFIG
@@ -97,7 +98,7 @@ def loadMetaDataFromTempFile():
     return meta
 
 
-def loadData():
+def loadData(meta):
 
     # Check source data is there
     if not os.path.isfile(CONFIG['DATA_DIRECTORY'] + '/' +
@@ -116,8 +117,40 @@ def loadData():
 
     expectedSize = (CONFIG['EXPECTED_ROW_COUNT'], CONFIG['EXPECTED_COL_COUNT'])
     if df.shape != expectedSize:
-        raise ValueError("Size of dataset has changed! Expecting " +
-                         str(expectedSize) + ", got " + str(df.shape))
+        print("ERROR: Size of dataset has changed! Expecting " +
+              str(expectedSize) + ", got " + str(df.shape) + '. Either fix ' +
+              'the import file or change the expected value in config.py')
+        sys.exit()
+
+    doesMetaHaveAllCols = True
+    if len(list(df)) != len(meta['fullColName']):
+        doesMetaHaveAllCols = False
+    elif list(df) != meta['fullColName'].tolist():
+        doesMetaHaveAllCols = False
+
+    if not doesMetaHaveAllCols:
+        print()
+        print('WARNING: columns in imported data do not match columns in ' +
+              'meta data')
+        print()
+        print('*** outputting imported data columns not in meta data ' +
+              'columns to file dataColsMissingFromMeta.csv ***')
+        print()
+        cols = list(set(list(df)) - set(meta['fullColName'].tolist()))
+        with open('dataColsMissingFromMeta.csv', 'w', newline='') as myfile:
+            wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
+            for col in cols:
+                wr.writerow([col, ])
+        print('*** outputting meta data columns not in imported data ' +
+              'columns to file metaColsMissingFromData.csv ***')
+        print()
+        cols = list(set(list(meta['fullColName'].tolist())) - set(df))
+        with open('metaColsMissingFromData.csv', 'w', newline='') as myfile:
+            wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
+            for col in cols:
+                wr.writerow([col, ])
+        print()
+
     return df
 
 
@@ -262,7 +295,8 @@ def run(args):
     else:
         meta = loadMetaDataFromTempFile()
 
-    df = loadData()
+    df = loadData(meta)
+
     df = filterToInscopeColumns(df, meta)
     df = deleteTestData(df)
 
