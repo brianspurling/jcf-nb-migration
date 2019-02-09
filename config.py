@@ -1,8 +1,8 @@
 
 CONFIG = {
-    'INPUT_FILENAME': 'export_01_sample.csv',
+    'INPUT_FILENAME': 'export_02_full_from_jcf.csv',
     'OUTPUT_FILENAME': 'data_prepped_for_nb.csv',
-    'EXPECTED_ROW_COUNT': 1000,  # 93954,
+    'EXPECTED_ROW_COUNT': 93807,
     'EXPECTED_COL_COUNT': 297,
     'DATA_DIRECTORY': 'data',
     'CUSTOM_FIELDS_DIRECTORY': 'customFieldValues',
