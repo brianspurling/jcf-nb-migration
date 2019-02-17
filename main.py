@@ -72,6 +72,9 @@ def setup():
 
 
 def loadMetadataFromGSheet():
+
+    # Meta data and cleaned religion data is in the same spreadsheet
+
     print('Connecting to Google Sheets')
     _client = gspread.authorize(
         ServiceAccountCredentials.from_json_keyfile_name(
@@ -95,7 +98,23 @@ def loadMetadataFromGSheet():
     rels.to_csv(CONFIG['DATA_DIRECTORY'] + '/' +
                 CONFIG['RELIGIONS_MAP_TMP_FILENAME'], index=False)
 
-    return (meta, rels)
+    # Cleaned repeated-values data is in a different spreadsheet
+    _client = gspread.authorize(
+        ServiceAccountCredentials.from_json_keyfile_name(
+            CONFIG['GOOGLE_API_KEY_FILE'],
+            CONFIG['GOOGLE_API_SCOPE']))
+    conn = _client.open(CONFIG['REPEATED_DATA_GSHEET_NAME'])
+
+    repData = {}
+    for col in CONFIG['COLS_WITH_REPEATD_DATA']:
+        ws = conn.worksheet(col[0:99])
+        repData[col[0:99]] = pd.read_json(json.dumps(ws.get_all_records()))
+        filename = col[0:99].replace('/', '')
+        repData[col[0:99]].to_csv(CONFIG['DATA_DIRECTORY'] + '/' +
+                                  'repData_' + filename + '.csv',
+                                  index=False)
+
+    return (meta, rels, repData)
 
 
 def loadMetaDataFromTempFile():
@@ -103,7 +122,12 @@ def loadMetaDataFromTempFile():
                        CONFIG['META_DATA_TMP_FILENAME'])
     rels = pd.read_csv(CONFIG['DATA_DIRECTORY'] + '/' +
                        CONFIG['RELIGIONS_MAP_TMP_FILENAME'])
-    return (meta, rels)
+    repData = {}
+    for col in CONFIG['COLS_WITH_REPEATD_DATA']:
+        filename = col[0:99].replace('/', '')
+        repData[col[0:99]] = pd.read_csv(CONFIG['DATA_DIRECTORY'] + '/' +
+                                         'repData_' + filename + '.csv')
+    return (meta, rels, repData)
 
 
 def loadData(meta):
@@ -471,9 +495,9 @@ def run(args):
         sys.exit()
 
     if opts['LOAD_METADATA_FROM_GSHEET']:
-        (meta, rels) = loadMetadataFromGSheet()
+        (meta, rels, repData) = loadMetadataFromGSheet()
     else:
-        (meta, rels) = loadMetaDataFromTempFile()
+        (meta, rels, repData) = loadMetaDataFromTempFile()
 
     df = loadData(meta)
 

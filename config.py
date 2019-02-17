@@ -14,7 +14,7 @@ CONFIG = {
         'https://spreadsheets.google.com/feeds',
         'https://www.googleapis.com/auth/drive'],
     'META_DATA_TMP_FILENAME': 'meta_data.csv',
-    'COLS_WITH_REPEATD_DATE': [
+    'COLS_WITH_REPEATD_DATA': [
         'Organisational/company sign up:Region',
         'Schools 2018:Key Contact Name',
         'Schools 2018:Region',
