@@ -268,6 +268,12 @@ def outputColumnsWithRepeatedData(df):
         ws.update_cells(cell_list)
 
 
+def outputReligionData(df):
+    rels = pd.DataFrame(df['Are you a person of faith?'].unique()).dropna()
+    rels.columns = ['VALUES']
+    rels.to_csv('data/relgions_for_cleaning.csv', index=False)
+
+
 def cleanData(df, rels):
 
     # TODO: need to change col names back to legacy col names, because
@@ -309,10 +315,6 @@ def cleanData(df, rels):
                        df['Join Date'].str.slice(8, 2) +
                        df['Join Date'].str.slice(0, 4))
 
-    # Output region column, for manual cleaning
-    # rels = pd.DataFrame(df['Are you a person of faith?'].unique()).dropna()
-    # rels.columns = ['VALUES']
-    # rels.to_csv('data/relgions_for_cleaning.csv', index=False)
 
     # Clean religion columns based on mapping
     new_df = pd.merge(
@@ -496,9 +498,11 @@ def run(args):
     # cleaned the data in this spreadsheet!
     # outputColumnsWithRepeatedData(df)
 
-    outputMultiChoiceLists(df, meta)
+    # outputReligionData(df)
 
     df = cleanData(df, rels)
+
+    outputMultiChoiceLists(df, meta)
 
     df = processTags(df, meta)
 
