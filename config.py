@@ -14,4 +14,16 @@ CONFIG = {
         'https://spreadsheets.google.com/feeds',
         'https://www.googleapis.com/auth/drive'],
     'META_DATA_TMP_FILENAME': 'meta_data.csv',
+    'COLS_WITH_REPEATD_DATE': [
+        'Organisational/company sign up:Region',
+        'Schools 2018:Key Contact Name',
+        'Schools 2018:Region',
+        '2018 Supporter Pack:Are you planning on attending or organising an event?',
+        '2018 Supporter Pack:What kind of Get Together will you organise?',
+        'Organisational/company sign up:What is your reach?',
+        'PACK - Form 2 - Who With:Who would you most like to have a get together with? Letting us know will mean we can give you better support setting up your event.',
+        'PLEDGE 1 TGGT Website:Will you pledge to do something -- big or small -- to bring your local community together?',
+        'PLEDGE 2 TGGT Website:Which of these activities appeals to you most?',
+        'Christmas Sign Up:Checkbox',
+        'PACK - Form 1 - Details:What type of pack would you like?']
 }
