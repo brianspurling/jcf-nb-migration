@@ -5,6 +5,7 @@ CONFIG = {
     'EXPECTED_ROW_COUNT': 93807,
     'EXPECTED_COL_COUNT': 297,
     'DATA_DIRECTORY': 'data',
+    'RELIGIONS_MAP_TMP_FILENAME': 'religion_map.csv',
     'CUSTOM_FIELDS_DIRECTORY': 'customFieldValues',
     'META_DATA_GSHEET_NAME': 'JCF - Source to Target Mapping',
     'GOOGLE_API_KEY_FILE': 'jcf_google_api_key_file.json',

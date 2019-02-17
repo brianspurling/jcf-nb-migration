@@ -83,19 +83,27 @@ def loadMetadataFromGSheet():
     for ws in conn.worksheets():
         if ws.title == 'STM':
             stm = ws
-            break
+        if ws.title == 'RELIGIONS':
+            religions = ws
 
     meta = pd.read_json(json.dumps(stm.get_all_records()))
+    rels = pd.read_json(json.dumps(religions.get_all_records()))
 
-    meta.to_csv(CONFIG['DATA_DIRECTORY'] + '/' + CONFIG['META_DATA_TMP_FILENAME'], index=False)
+    meta.to_csv(CONFIG['DATA_DIRECTORY'] + '/' +
+                CONFIG['META_DATA_TMP_FILENAME'], index=False)
 
-    return meta
+    rels.to_csv(CONFIG['DATA_DIRECTORY'] + '/' +
+                CONFIG['RELIGIONS_MAP_TMP_FILENAME'], index=False)
+
+    return (meta, rels)
 
 
 def loadMetaDataFromTempFile():
     meta = pd.read_csv(CONFIG['DATA_DIRECTORY'] + '/' +
                        CONFIG['META_DATA_TMP_FILENAME'])
-    return meta
+    rels = pd.read_csv(CONFIG['DATA_DIRECTORY'] + '/' +
+                       CONFIG['RELIGIONS_MAP_TMP_FILENAME'])
+    return (meta, rels)
 
 
 def loadData(meta):
@@ -127,13 +135,11 @@ def loadData(meta):
               'the import file or change the expected value in config.py')
         sys.exit()
 
-    doesMetaHaveAllCols = True
-    if len(list(df)) != len(meta['fullColName']):
-        doesMetaHaveAllCols = False
-    elif list(df) != meta['fullColName'].tolist():
-        doesMetaHaveAllCols = False
+    # Make sure we have meta data for every imported column
 
-    if not doesMetaHaveAllCols:
+    if (len(list(set(list(df)) - set(meta['fullColName'].tolist()))) > 0 or
+            len(list(set(meta['fullColName'].tolist()) - set(list(df)))) > 0):
+
         print()
         print('WARNING: columns in imported data do not match columns in ' +
               'meta data')
@@ -149,7 +155,7 @@ def loadData(meta):
         print('*** outputting meta data columns not in imported data ' +
               'columns to file metaColsMissingFromData.csv ***')
         print()
-        cols = list(set(list(meta['fullColName'].tolist())) - set(df))
+        cols = list(set(meta['fullColName'].tolist()) - set(list(df)))
         with open('metaColsMissingFromData.csv', 'w', newline='') as myfile:
             wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
             for col in cols:
@@ -157,6 +163,24 @@ def loadData(meta):
         print()
 
     return df
+
+# A temporary function to check a bunch of non-meta dataed columsn were empty
+# def checkEmptyColsAreEmpty(df, meta):
+#     allOK = True
+#     for colName in meta.loc[meta['IN SCOPE'] == '?', 'fullColName'].tolist():
+#         nonNullVals = df.loc[df[colName].notnull(), colName].tolist()
+#         if len(nonNullVals) > 0:
+#             allOK = False
+#             print("|" + colName + "| >> meta data is not populated, but " +
+#                   "the column " +
+#                   "in the data export is not empty. It contains: ")
+#             print()
+#             print('------')
+#             print(nonNullVals)
+#             print('------')
+#             print()
+#     if allOK:
+#         print('All ok')
 
 
 def filterToInscopeColumns(df, meta):
@@ -186,33 +210,86 @@ def deleteTestData(df):
     return df
 
 
-def cleanData(df):
+def cleanData(df, rels):
 
     # TODO: need to change col names back to legacy col names, because
     # col name mapping is now done last
 
     # Remove commas from ~12 last names
-    df.loc[(df['last_name'].str.contains(',', na=False)) & (df['last_name'] != 'F. Queen, Jr.'), 'Last Name'] = df['last_name'].str.replace(',', '')
+    df.loc[(df['Last Name'].str.contains(',', na=False)) &
+           (df['Last Name'] != 'F. Queen, Jr.'),
+           'Last Name'] = df['Last Name'].str.replace(',', '')
 
     # Delete address fields that are just commas
-    df.loc[(df['address1'] == ', '), 'address1'] = np.nan
-    df.loc[(df['address1'] == ','), 'address1'] = np.nan
+    df.loc[(df['Address 1'] == ', '), 'Address 1'] = np.nan
+    df.loc[(df['Address 1'] == ','), 'Address 1'] = np.nan
 
     # Lower case some city names
-    df.loc[df['city'].str.match('^.*[A-Z]$', na=False), 'city'] = df['city'].str.title()
+    df.loc[df['City'].str.match('^.*[A-Z]$', na=False), 'City'] = \
+        df['City'].str.title()
 
     # Manually fix some city names
-    df.loc[df['city'] == 'St. Mary&#039;s Ward', 'city'] = "St. Mary's Ward"
+    df.loc[df['City'] == 'St. Mary&#039;s Ward', 'City'] = "St. Mary's Ward"
 
-    # Replace seven "0" phone numbers with nan
-    # TODO: change this to regex, there are 0000 etc too
-    # df.loc[df['Home Phone'] == '0', 'Home Phone'] = np.nan
+    # Remove "0" zip codes
+    df.loc[df['Zip'] == '0', 'Zip'] = np.nan
+
+    # Fix the typo email address
+    df.loc[df['Email'] == 'a..murdock@dsl.pipex.com', 'Email'] = \
+        'a.murdock@dsl.pipex.com'
+
+    # Remove invalid phone numbers with nan
+    df.loc[df['Home Phone'].isin([
+           '0', '999', '01', '07', '34', '84', '447511', '447911']),
+           'Phone Number'] = np.nan
+
+    # Delete the parliament number, that is on 28 records
+    df.loc[df['Work Phone'] == '02072193000', 'Work Number'] = np.nan
+
+    # Change date format
+    df['Join Date'] = (df['Join Date'].str.slice(5, 2) +
+                       df['Join Date'].str.slice(8, 2) +
+                       df['Join Date'].str.slice(0, 4))
+
+    # Output region column, for manual cleaning
+    # rels = pd.DataFrame(df['Are you a person of faith?'].unique()).dropna()
+    # rels.columns = ['VALUES']
+    # rels.to_csv('data/relgions_for_cleaning.csv', index=False)
+
+    # Clean religion columns based on mapping
+    new_df = pd.merge(
+        df,
+        rels,
+        how='left',
+        left_on=['Are you a person of faith?'],
+        right_on=['Values in Data'])
+
+    df['Are you a person of faith?'] = new_df['Replacement Values']
+
+    # Remove country and /t from the columns: Girlguiding Sign Up:County
+    # Girlguiding Sign Up:County
+
+    # Replace newline char with ','
+    colName = ("Girlguiding Sign Up:If you'd like us to post you an ideas " +
+               "pack, please fill out your address details:")
+    df[colName] = df[colName].str.replace('\n', ', ')
+
+    colName = ("Scouts Events:If you'd like us to post you an ideas pack, " +
+               "please fill out your address details:")
+    df[colName] = df[colName].str.replace('\n', ', ')
+
+
+    # Replace strings "Na: and "None" with empty string
+    colName = 'Organisational/company sign up:Name of Organisation'
+    df.loc[df[colName].isin(["None", "Na"]), colName] = ''
 
     return df
 
 
 def outputMultiChoiceLists(df, meta):
-    customFields = list(meta.loc[meta['Custom Field Type?'] == 'Multiple Choice', 'fullColName'])
+    customFields = list(meta.loc[
+        meta['Custom Field Type?'] == 'Multiple Choice', 'fullColName'])
+
     for col in customFields:
         customFieldValues = pd.DataFrame(df[col].unique()).dropna()
         customFieldValues.columns = ['VALUES']
@@ -222,7 +299,8 @@ def outputMultiChoiceLists(df, meta):
 
 
 def processTags(df, meta):
-    df_tagMapping = meta.loc[(meta['Tag?'] == 'T') & (meta['IN SCOPE'] == 'T'), ['fullColName', 'Tag Name']]
+    df_tagMapping = meta.loc[(meta['Tag?'] == 'T') & (meta['IN SCOPE'] == 'T'),
+                             ['fullColName', 'Tag Name']]
     tagMapping = df_tagMapping.set_index('fullColName')['Tag Name'].to_dict()
 
     # Add a tag column containing an empty list for every row, then loop
@@ -244,7 +322,6 @@ def processTags(df, meta):
 
     df['tags'] = df['tags'].apply(lambda x: ','.join(map(str, x)))
 
-
     return df
 
 
@@ -252,20 +329,72 @@ def mapColumns(df, meta):
 
     # Get a dictionary of our two meta data columns (orig name, NB name)
 
+    # TODO: Before doing this, need to remove duplicated answers :(
+    print()
+
     mapping = {}
-    targetColList = []
+    reverseMapping = {}
+    colsToDrop = []
     for i, row in meta.iterrows():
         if row['IN SCOPE'] == 'T':
             mappedValue = row['NB TARGET FIELD']
             if row['NB TARGET FIELD'] is np.nan:
                 mappedValue = 'NOT MAPPED - ' + str(i)
 
-            if mappedValue in targetColList:
-                mapping[row['fullColName']] = mappedValue + ' - ' + str(i)
+            # Some source columns have been mapped to the same target columns.
+            # These columns need merging
+            if mappedValue in reverseMapping:
+
+                existingColName = reverseMapping[mappedValue]
+                newColName = row['fullColName']
+                print('Merging columns >>> ' +
+                      '\n  - ' + existingColName +
+                      '\n  - ' + newColName +
+                      '\nInto >>> ' +
+                      '\n  - ' + mappedValue)
+                df[existingColName] = df[existingColName].fillna('')
+                df[newColName] = df[newColName].fillna('')
+
+                examplePrinted = False
+
+                for j, dfrow in df.iterrows():
+
+                    doMerge = True
+                    # If the the two values are the same, don't merge
+                    if dfrow[existingColName] == dfrow[newColName]:
+                        doMerge = False
+                    # If one of the the two values are blank, don't merge
+                    elif (dfrow[existingColName] == '' or
+                            dfrow[newColName] == ''):
+                        doMerge = False
+
+                    if doMerge:
+                        dfrow[existingColName] = \
+                            str(dfrow[existingColName]) + \
+                            '  |  ' + \
+                            str(dfrow[newColName])
+                        if not examplePrinted:
+                            print('** Example of merged value: ' +
+                                  str(dfrow[existingColName]) + '\n')
+                            examplePrinted = True
+                            print(dfrow['Email'])
+
+                        colsToDrop.append(newColName)
+                if not examplePrinted:
+                    print('** No merging needed **\n')
+
             else:
                 mapping[row['fullColName']] = mappedValue
 
-            targetColList.append(mappedValue)
+            reverseMapping[mappedValue] = row['fullColName']
+
+    # Drop the columns we merged together
+    df.drop(
+        colsToDrop,
+        axis=1,
+        inplace=True)
+
+    # And rename everything
 
     df.rename(
         index=str,
@@ -279,6 +408,8 @@ def outputData(df):
 
     df.to_csv(CONFIG['DATA_DIRECTORY'] + '/' +
               CONFIG['OUTPUT_FILENAME'], index=False)
+    df.head(10000).to_csv(CONFIG['DATA_DIRECTORY'] + '/' + 'subset_' +
+                          CONFIG['OUTPUT_FILENAME'], index=False)
     print("Saved data to " + CONFIG['OUTPUT_FILENAME'])
 
 
@@ -292,22 +423,23 @@ def run(args):
         sys.exit()
 
     if opts['LOAD_METADATA_FROM_GSHEET']:
-        meta = loadMetadataFromGSheet()
+        (meta, rels) = loadMetadataFromGSheet()
     else:
-        meta = loadMetaDataFromTempFile()
+        (meta, rels) = loadMetaDataFromTempFile()
 
     df = loadData(meta)
 
     df = filterToInscopeColumns(df, meta)
-    df = deleteTestData(df)
+
+    # df = deleteTestData(df)
 
     outputMultiChoiceLists(df, meta)
 
-    # df = cleanData(df)
+    df = cleanData(df, rels)
 
     df = processTags(df, meta)
 
-    df = mapColumns(df, meta)
+    # df = mapColumns(df, meta)
 
     outputData(df)
 
