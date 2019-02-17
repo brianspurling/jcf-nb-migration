@@ -8,6 +8,7 @@ CONFIG = {
     'RELIGIONS_MAP_TMP_FILENAME': 'religion_map.csv',
     'CUSTOM_FIELDS_DIRECTORY': 'customFieldValues',
     'META_DATA_GSHEET_NAME': 'JCF - Source to Target Mapping',
+    'REPEATED_DATA_GSHEET_NAME': 'JCF - Repeated Data Output',
     'GOOGLE_API_KEY_FILE': 'jcf_google_api_key_file.json',
     'GOOGLE_API_SCOPE': [
         'https://spreadsheets.google.com/feeds',

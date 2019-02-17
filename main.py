@@ -210,6 +210,64 @@ def deleteTestData(df):
     return df
 
 
+def outputColumnsWithRepeatedData(df):
+
+    _client = gspread.authorize(
+        ServiceAccountCredentials.from_json_keyfile_name(
+            CONFIG['GOOGLE_API_KEY_FILE'],
+            CONFIG['GOOGLE_API_SCOPE']))
+    ss = _client.open(CONFIG['REPEATED_DATA_GSHEET_NAME'])
+
+    cols = [
+        'Organisational/company sign up:Region',
+        'Schools 2018:Key Contact Name',
+        'Schools 2018:Region',
+        '2018 Supporter Pack:Are you planning on attending or organising an event?',
+        '2018 Supporter Pack:What kind of Get Together will you organise?',
+        'Organisational/company sign up:What is your reach?',
+        'PACK - Form 2 - Who With:Who would you most like to have a get together with? Letting us know will mean we can give you better support setting up your event.',
+        'PLEDGE 1 TGGT Website:Will you pledge to do something -- big or small -- to bring your local community together?',
+        'PLEDGE 2 TGGT Website:Which of these activities appeals to you most?',
+        'Christmas Sign Up:Checkbox',
+        'PACK - Form 1 - Details:What type of pack would you like?']
+
+    existingWSs = ss.worksheets()
+    existingWSTitles = []
+    for ws in existingWSs:
+        existingWSTitles.append(ws.title)
+
+    for col in cols:
+
+        if col[0:99] in existingWSTitles:
+            ss.del_worksheet(ss.worksheet(col[0:99]))
+
+        ws = ss.add_worksheet(title=col[0:99],
+                              rows=len(df.loc[df[col].notna()])+1,
+                              cols=3)
+
+        # We build up our new GSheets table first, in memory,
+        # then write it all in one go.
+        cell_list = ws.range('A1:C'+str(len(df.loc[df[col].notna()])+1))
+
+        rangeRowCount = 0
+        cell_list[rangeRowCount].value = 'Email'
+        cell_list[rangeRowCount+1].value = col
+        cell_list[rangeRowCount+2].value = 'Length'
+
+        rangeRowCount += 3
+
+        df_op = df.loc[df[col].notna(), ['Email', col]]
+        df_op['length'] = df_op[col].str.len()
+        df_op = df_op.sort_values('length', ascending=False)
+        for i, row in df_op.iterrows():
+            cell_list[rangeRowCount].value = row['Email']
+            cell_list[rangeRowCount+1].value = row[col]
+            cell_list[rangeRowCount+2].value = row['length']
+            rangeRowCount += 3
+
+        ws.update_cells(cell_list)
+
+
 def cleanData(df, rels):
 
     # TODO: need to change col names back to legacy col names, because
@@ -432,6 +490,11 @@ def run(args):
     df = filterToInscopeColumns(df, meta)
 
     # df = deleteTestData(df)
+
+    # If you uncomment this, it will overwrite the repeated-values spreadsheet,
+    # which you probably don't want to do, given that JCF have already manually
+    # cleaned the data in this spreadsheet!
+    # outputColumnsWithRepeatedData(df)
 
     outputMultiChoiceLists(df, meta)
 
