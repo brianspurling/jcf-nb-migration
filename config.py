@@ -1,8 +1,8 @@
 
 CONFIG = {
-    'INPUT_FILENAME': 'export_02_full_from_jcf.csv',
+    'INPUT_FILENAME': 'export_03_15Feb.csv',
     'OUTPUT_FILENAME': 'data_prepped_for_nb.csv',
-    'EXPECTED_ROW_COUNT': 93807,
+    'EXPECTED_ROW_COUNT': 68589,
     'EXPECTED_COL_COUNT': 297,
     'DATA_DIRECTORY': 'data',
     'RELIGIONS_MAP_TMP_FILENAME': 'religion_map.csv',
