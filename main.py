@@ -431,14 +431,15 @@ def mapColumns(df, meta):
             # Some source columns have been mapped to the same target columns.
             # These columns need merging
             if mappedValue in reverseMapping:
-
+                totalMergedValues = 0
+                op = ''
                 existingColName = reverseMapping[mappedValue]
                 newColName = row['fullColName']
-                print('Merging columns >>> ' +
-                      '\n  - ' + existingColName +
-                      '\n  - ' + newColName +
-                      '\nInto >>> ' +
-                      '\n  - ' + mappedValue)
+                op += ('Merging columns >>> ' +
+                       '\n  - ' + existingColName +
+                       '\n  - ' + newColName +
+                       '\nInto >>> ' +
+                       '\n  - ' + mappedValue + '\n')
                 df[existingColName] = df[existingColName].fillna('')
                 df[newColName] = df[newColName].fillna('')
 
@@ -450,25 +451,35 @@ def mapColumns(df, meta):
                     # If the the two values are the same, don't merge
                     if dfrow[existingColName] == dfrow[newColName]:
                         doMerge = False
-                    # If one of the the two values are blank, don't merge
-                    elif (dfrow[existingColName] == '' or
-                            dfrow[newColName] == ''):
+                    # If the column we're mering in (newColName) is blank,
+                    # don't merge
+                    elif dfrow[newColName] == '':
                         doMerge = False
 
                     if doMerge:
-                        dfrow[existingColName] = \
-                            str(dfrow[existingColName]) + \
-                            '  |  ' + \
-                            str(dfrow[newColName])
-                        if not examplePrinted:
-                            print('** Example of merged value: ' +
-                                  str(dfrow[existingColName]) + '\n')
-                            examplePrinted = True
-                            print(dfrow['Email'])
+                        if dfrow[existingColName] == '':
+                            dfrow[existingColName] = str(dfrow[newColName])
+                        else:
+                            totalMergedValues = totalMergedValues + 1
+                            dfrow[existingColName] = \
+                                str(dfrow[existingColName]) + \
+                                '  |  ' + \
+                                str(dfrow[newColName])
+                            if not examplePrinted:
+                                op += ('  - Example of merged value: ' +
+                                       str(dfrow[existingColName]) + '\n')
+                                examplePrinted = True
 
-                        colsToDrop.append(newColName)
-                if not examplePrinted:
-                    print('** No merging needed **\n')
+                if totalMergedValues > 0:
+                    op += ('  - merged ' + str(totalMergedValues) +
+                           ' rows in total\n\n')
+                else:
+                    op += ('  - No merging needed\n\n')
+
+                colsToDrop.append(newColName)
+
+                if totalMergedValues > 0:
+                    print(op)
 
             else:
                 mapping[row['fullColName']] = mappedValue
@@ -533,7 +544,7 @@ def run(args):
 
     df = processTags(df, meta)
 
-    # df = mapColumns(df, meta)
+    df = mapColumns(df, meta)
 
     outputData(df)
 
