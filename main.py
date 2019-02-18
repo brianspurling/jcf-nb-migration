@@ -108,11 +108,11 @@ def loadMetadataFromGSheet():
     repData = {}
     for col in CONFIG['COLS_WITH_REPEATD_DATA']:
         ws = conn.worksheet(col[0:99])
-        repData[col[0:99]] = pd.read_json(json.dumps(ws.get_all_records()))
+        repData[col] = pd.read_json(json.dumps(ws.get_all_records()))
         filename = col[0:99].replace('/', '')
-        repData[col[0:99]].to_csv(CONFIG['DATA_DIRECTORY'] + '/' +
-                                  'repData_' + filename + '.csv',
-                                  index=False)
+        repData[col].to_csv(CONFIG['DATA_DIRECTORY'] + '/' +
+                            'repData_' + filename + '.csv',
+                            index=False)
 
     return (meta, rels, repData)
 
@@ -125,8 +125,8 @@ def loadMetaDataFromTempFile():
     repData = {}
     for col in CONFIG['COLS_WITH_REPEATD_DATA']:
         filename = col[0:99].replace('/', '')
-        repData[col[0:99]] = pd.read_csv(CONFIG['DATA_DIRECTORY'] + '/' +
-                                         'repData_' + filename + '.csv')
+        repData[col] = pd.read_csv(CONFIG['DATA_DIRECTORY'] + '/' +
+                                   'repData_' + filename + '.csv')
     return (meta, rels, repData)
 
 
@@ -287,10 +287,7 @@ def outputReligionData(df):
     rels.to_csv('data/relgions_for_cleaning.csv', index=False)
 
 
-def cleanData(df, rels):
-
-    # TODO: need to change col names back to legacy col names, because
-    # col name mapping is now done last
+def cleanData(df, rels, repData):
 
     # Remove commas from ~12 last names
     df.loc[(df['Last Name'].str.contains(',', na=False)) &
@@ -338,6 +335,19 @@ def cleanData(df, rels):
         right_on=['Values in Data'])
 
     df['Are you a person of faith?'] = new_df['Replacement Values']
+
+    # Clean columns that have repeated data (these have been manually
+    # cleaned in Google Sheets, and just need reading back in and the original
+    # values overriting
+    for col in CONFIG['COLS_WITH_REPEATD_DATA']:
+        cleanedData = repData[col]
+        new_df = pd.merge(
+            df,
+            cleanedData,
+            how='left',
+            left_on=['Email'],
+            right_on=['Email'])
+        df[col] = new_df[col + '_y']
 
     # Remove country and /t from the columns: Girlguiding Sign Up:County
     # Girlguiding Sign Up:County
@@ -512,7 +522,7 @@ def run(args):
 
     # outputReligionData(df)
 
-    df = cleanData(df, rels)
+    df = cleanData(df, rels, repData)
 
     outputMultiChoiceLists(df, meta)
 
