@@ -315,16 +315,24 @@ def cleanData(df, rels, repData):
     # Remove invalid phone numbers with nan
     df.loc[df['Home Phone'].isin([
            '0', '999', '01', '07', '34', '84', '447511', '447911']),
-           'Phone Number'] = np.nan
+           'Home Phone'] = np.nan
 
     # Delete the parliament number, that is on 28 records
-    df.loc[df['Work Phone'] == '02072193000', 'Work Number'] = np.nan
+    df.loc[df['Work Phone'] == '02072193000', 'Work Phone'] = np.nan
 
     # Change date format
-    df['Join Date'] = (df['Join Date'].str.slice(5, 2) +
-                       df['Join Date'].str.slice(8, 2) +
-                       df['Join Date'].str.slice(0, 4))
+    df['Join Date - year'] = df['Join Date'].str.slice(0, 4)
+    df['Join Date - month'] = df['Join Date'].str.slice(5, 7)
+    df['Join Date - day'] = df['Join Date'].str.slice(8, 10)
 
+    df['Join Date'] = df['Join Date - month'].astype(str) + '/' + \
+        df['Join Date - day'].astype(str) + '/' + \
+        df['Join Date - year'].astype(str)
+
+    df.drop(
+        ['Join Date - year', 'Join Date - month', 'Join Date - day'],
+        axis=1,
+        inplace=True)
 
     # Clean religion columns based on mapping
     new_df = pd.merge(
@@ -409,9 +417,6 @@ def processTags(df, meta):
 
 def mapColumns(df, meta):
 
-    # Get a dictionary of our two meta data columns (orig name, NB name)
-
-    # TODO: Before doing this, need to remove duplicated answers :(
     print()
 
     mapping = {}
