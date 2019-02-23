@@ -463,7 +463,7 @@ def mapColumns(df, meta):
                             totalMergedValues = totalMergedValues + 1
                             dfrow[existingColName] = \
                                 str(dfrow[existingColName]) + \
-                                '  |  ' + \
+                                ', ' + \
                                 str(dfrow[newColName])
                             if not examplePrinted:
                                 op += ('  - Example of merged value: ' +
@@ -535,7 +535,6 @@ def run(args):
     # which you probably don't want to do, given that JCF have already manually
     # cleaned the data in this spreadsheet!
     # outputColumnsWithRepeatedData(df)
-
     # outputReligionData(df)
 
     df = cleanData(df, rels, repData)
