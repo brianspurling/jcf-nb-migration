@@ -207,7 +207,8 @@ def loadData(meta):
     df.columns = allCols
 
     # For testing
-    # df = df.loc[df['Email'].isin([])]
+    # df = df.loc[df['Email'].isin([''])]
+    # df.to_csv('temp_temp.csv')
 
     expectedSize = (CONFIG['EXPECTED_ROW_COUNT'], CONFIG['EXPECTED_COL_COUNT'])
     if df.shape != expectedSize:
