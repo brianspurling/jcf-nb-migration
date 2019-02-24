@@ -2,6 +2,7 @@
 CONFIG = {
     'INPUT_FILENAME': 'export_03_15Feb.csv',
     'OUTPUT_FILENAME': 'data_prepped_for_nb.csv',
+    'SAMPLE_OUTPUT_FILENAME': 'sample_output.csv',
     'EXPECTED_ROW_COUNT': 68589,
     'EXPECTED_COL_COUNT': 297,
     'DATA_DIRECTORY': 'data',

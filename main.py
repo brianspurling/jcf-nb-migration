@@ -614,11 +614,16 @@ def outputData(df):
     logFunctionStart(funcName)
     report = ''
 
+    sampleSize = 10000
+
     df.to_csv(CONFIG['DATA_DIRECTORY'] + '/' +
               CONFIG['OUTPUT_FILENAME'], index=False)
-    df.head(10000).to_csv(CONFIG['DATA_DIRECTORY'] + '/' + 'subset_' +
-                          CONFIG['OUTPUT_FILENAME'], index=False)
-    report += ("Saved data to " + CONFIG['OUTPUT_FILENAME'])
+    df.head(sampleSize).to_csv(CONFIG['DATA_DIRECTORY'] + '/' +
+                               CONFIG['SAMPLE_OUTPUT_FILENAME'], index=False)
+    report += ("Saved " + str(df.shape[0]) + " rows of data to " +
+               CONFIG['OUTPUT_FILENAME'] + '\n')
+    report += ("Also saved " + str(sampleSize) + " rows of data to " +
+               CONFIG['SAMPLE_OUTPUT_FILENAME'] + '\n')
 
     logFunctionEnd(report)
 
