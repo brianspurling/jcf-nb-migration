@@ -575,6 +575,7 @@ def mapColumns(df, stm):
                     # This is slooow.
 
                     numberOfConcatentations = 0
+                    numberOfSimpleMerges = 0
 
                     for j, dfRow in df.iterrows():
 
@@ -583,20 +584,17 @@ def mapColumns(df, stm):
 
                         doMerge = True
 
-                        # If the the two values are the same, don't merge
-                        if fromVal == toVal:
-                            doMerge = False
-
-                        # If the value we're merging in (fromCol) is blank,
-                        # don't merge
-                        if fromVal is np.nan or fromVal == '' or fromVal == 'nan':
+                        # If the the two values are the same, or if the value
+                        # we're merging in (fromCol) is blank, don't merge
+                        if fromVal == toVal or fromVal == '':
                             doMerge = False
 
                         if doMerge:
 
                             # If the target value is blank, don't concat
-                            if toVal is np.nan or toVal == '':
+                            if toVal == '':
                                 df.at[j, toCol] = str(fromVal)
+                                numberOfSimpleMerges += 1
 
                             # Otherwise, we're concatentating, so log the o/p
                             else:
@@ -617,6 +615,12 @@ def mapColumns(df, stm):
                         fromCol,
                         axis=1,
                         inplace=True)
+
+                    print(' - ' + str(numberOfSimpleMerges) + ' simple merges')
+                    print(' - ' + str(numberOfConcatentations) + ' concatenation merges')
+
+                df[toCol] = df[toCol].fillna('')
+    print('')
 
     logFunctionEnd(report)
 
