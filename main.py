@@ -364,41 +364,50 @@ def cleanData(df, rels, repData):
 
     funcName = 'Cleaning Data'
     logFunctionStart(funcName)
+    report = ''
 
     print('This will take a while...\n')
 
-    # Remove commas from ~12 last names
+    report += 'Replaced any null values with empty string\n'
+    df = df.fillna('')
+
+    report += 'Replaced all new line characters with ", "\n'
+    df = df.replace(to_replace=[r"\\t|\\n|\\r", "\t|\n|\r"],
+                    value=[", ", ", "],
+                    regex=True)
+
+    report += 'Removed commas from ~12 last names\n'
     df.loc[(df['Last Name'].str.contains(',', na=False)) &
            (df['Last Name'] != 'F. Queen, Jr.'),
            'Last Name'] = df['Last Name'].str.replace(',', '')
 
-    # Delete address fields that are just commas
-    df.loc[(df['Address 1'] == ', '), 'Address 1'] = np.nan
-    df.loc[(df['Address 1'] == ','), 'Address 1'] = np.nan
+    report += 'Deleted address fields that are just commas\n'
+    df.loc[(df['Address 1'] == ', '), 'Address 1'] = ''
+    df.loc[(df['Address 1'] == ','), 'Address 1'] = ''
 
-    # Lower case some city names
+    report += 'Converted some city names to lower case\n'
     df.loc[df['City'].str.match('^.*[A-Z]$', na=False), 'City'] = \
         df['City'].str.title()
 
-    # Manually fix some city names
-    df.loc[df['City'] == 'St. Mary&#039;s Ward', 'City'] = "St. Mary's Ward"
+    report += 'Replaced &#039; in city names with apostrophe\n'
+    df['City'] == df['City'].str.replace('&#039;', "'")
 
-    # Remove "0" zip codes
-    df.loc[df['Zip'] == '0', 'Zip'] = np.nan
+    report += 'Replaced "0" zip codes with empty string\n'
+    df.loc[df['Zip'] == '0', 'Zip'] = ''
 
-    # Fix the typo email address
+    report += 'Fixed typo email address\n'
     df.loc[df['Email'] == 'a..murdock@dsl.pipex.com', 'Email'] = \
         'a.murdock@dsl.pipex.com'
 
-    # Remove invalid phone numbers with nan
+    report += 'Replaced invalid phone numbers with empty string\n'
     df.loc[df['Home Phone'].isin([
            '0', '999', '01', '07', '34', '84', '447511', '447911']),
-           'Home Phone'] = np.nan
+           'Home Phone'] = ''
 
-    # Delete the parliament number, that is on 28 records
-    df.loc[df['Work Phone'] == '02072193000', 'Work Phone'] = np.nan
+    report += 'Deleted the Parliament Phone number (on 28 records)\n'
+    df.loc[df['Work Phone'] == '02072193000', 'Work Phone'] = ''
 
-    # Change date format
+    report += 'Changed date format to be compatible with NationBuilder\n'
     df['Join Date - year'] = df['Join Date'].str.slice(0, 4)
     df['Join Date - month'] = df['Join Date'].str.slice(5, 7)
     df['Join Date - day'] = df['Join Date'].str.slice(8, 10)
@@ -412,7 +421,7 @@ def cleanData(df, rels, repData):
         axis=1,
         inplace=True)
 
-    # Clean religion columns based on mapping
+    report += 'Cleaned religion columns based on manual mapping\n'
     new_df = pd.merge(
         df,
         rels,
@@ -422,9 +431,7 @@ def cleanData(df, rels, repData):
 
     df['Are you a person of faith?'] = new_df['Replacement Values']
 
-    # Clean columns that have repeated data (these have been manually
-    # cleaned in Google Sheets, and just need reading back in and the original
-    # values overriting
+    report += 'Cleaned columns that have repeated data using manual mapping\n'
     for col in CONFIG['COLS_WITH_REPEATD_DATA']:
         cleanedData = repData[col]
         new_df = pd.merge(
@@ -435,21 +442,12 @@ def cleanData(df, rels, repData):
             right_on=['Email'])
         df[col] = new_df[col + '_y']
 
-    # Remove country and /t from the columns: Girlguiding Sign Up:County
-    # Girlguiding Sign Up:County
-
-    # Replace newline char with ','
-    colName = ("Girlguiding Sign Up:If you'd like us to post you an ideas " +
-               "pack, please fill out your address details:")
-    df[colName] = df[colName].str.replace('\n', ', ')
-
-    colName = ("Scouts Events:If you'd like us to post you an ideas pack, " +
-               "please fill out your address details:")
-    df[colName] = df[colName].str.replace('\n', ', ')
-
-    # Replace strings "Na: and "None" with empty string
+    report += 'Replace strings "Na: and "None" in Organisation with empty string\n'
     colName = 'Organisational/company sign up:Name of Organisation'
     df.loc[df[colName].isin(["None", "Na"]), colName] = ''
+
+    report += 'Replaced any null values with empty string (again!)\n'
+    df = df.fillna('')
 
     logFunctionEnd()
 
@@ -491,15 +489,20 @@ def processTags(df, meta):
     # we need to avoid creating duplicate tags
     df['tags'] = [[]] * len(df)
     for colName in tagMapping:
-        for i, row in df.loc[df[colName].notna()].iterrows():
+        print('Assigning tag "' + tagMapping[colName] + '" where column "' + colName + '" is populated.', end='')
+        rowCount = 0
+        for i, row in df.loc[(df[colName].notna()) & (df[colName].map(str) != '')].iterrows():
+            rowCount += 1
             # There's probably a more pythonic/vectorised way to do this, but
             # I had troube getting this working so am leaving it be. The key
             # was the .copy()
             list = row['tags'].copy()
             if tagMapping[colName] not in list:
-                list.append(tagMapping[colName])
+                list.append(tagMapping[colName].strip())
             df.at[i, 'tags'] = list
+        print(' ' + str(rowCount) + ' rows tagged')
 
+    print()
     df['tags'] = df['tags'].apply(lambda x: ','.join(map(str, x)))
 
     logFunctionEnd()
