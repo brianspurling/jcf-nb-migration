@@ -39,7 +39,43 @@ def processArgs(args):
     return options
 
 
+def logFunctionStart(funcDesc):
+
+    spacer = ' ' * (62 - len(funcDesc))
+
+    op = ''
+    op += '\n'
+    op += '**************************************************************'
+    op += '***\n'
+    op += '*                                                             '
+    op += '  *\n'
+    op += '* ' + funcDesc + spacer + '*\n'
+    op += '*                                                             '
+    op += '  *\n'
+    op += '**************************************************************'
+    op += '***\n'
+
+    print(op)
+
+
+def logFunctionEnd(report=None):
+
+    op = ''
+
+    if report is not None and report != '':
+        op += report + '\n\n'
+
+    op += '[Completed]'
+
+    print(op)
+
+
 def setup():
+
+    funcName = 'Setting Up Pipeline'
+    logFunctionStart(funcName)
+
+    report = ''
 
     # Check Google API key is there
     if not os.path.isfile(CONFIG['GOOGLE_API_KEY_FILE']):
@@ -66,16 +102,21 @@ def setup():
     # warn that it needs to be created
     path = CONFIG['DATA_DIRECTORY'] + '/' + CONFIG['META_DATA_TMP_FILENAME']
     if not os.path.isfile(path):
-        print('Did not find a meta data text file (' + path + '). The first ' +
-              'time you run the pipeline use the `--meta` argument to pull ' +
-              'the latest meta data from the Google Sheet')
+        report += ('Did not find a meta data text file (' + path + '). ' +
+                   'The first time you run the pipeline use the `--meta` ' +
+                   'argument to pull the latest meta data from the Google ' +
+                   'Sheet')
+
+    logFunctionEnd(report)
 
 
 def loadMetadataFromGSheet():
 
+    funcName = 'Loading Meta Data from Google Sheet'
+    logFunctionStart(funcName)
+
     # Meta data and cleaned religion data is in the same spreadsheet
 
-    print('Connecting to Google Sheets')
     _client = gspread.authorize(
         ServiceAccountCredentials.from_json_keyfile_name(
             CONFIG['GOOGLE_API_KEY_FILE'],
@@ -114,10 +155,16 @@ def loadMetadataFromGSheet():
                             'repData_' + filename + '.csv',
                             index=False)
 
+    logFunctionEnd()
+
     return (meta, rels, repData)
 
 
 def loadMetaDataFromTempFile():
+
+    funcName = 'Loading Meta Data from CSV'
+    logFunctionStart(funcName)
+
     meta = pd.read_csv(CONFIG['DATA_DIRECTORY'] + '/' +
                        CONFIG['META_DATA_TMP_FILENAME'])
     rels = pd.read_csv(CONFIG['DATA_DIRECTORY'] + '/' +
@@ -127,10 +174,17 @@ def loadMetaDataFromTempFile():
         filename = col[0:99].replace('/', '')
         repData[col] = pd.read_csv(CONFIG['DATA_DIRECTORY'] + '/' +
                                    'repData_' + filename + '.csv')
+
+    logFunctionEnd()
+
     return (meta, rels, repData)
 
 
 def loadData(meta):
+
+    funcName = 'Loading Data from CSV'
+    logFunctionStart(funcName)
+    report = ''
 
     # Check source data is there
     if not os.path.isfile(CONFIG['DATA_DIRECTORY'] + '/' +
@@ -152,71 +206,71 @@ def loadData(meta):
     allCols = df.columns.str.replace('\n', '')
     df.columns = allCols
 
+    # For testing
+    # df = df.loc[df['Email'].isin([])]
+
     expectedSize = (CONFIG['EXPECTED_ROW_COUNT'], CONFIG['EXPECTED_COL_COUNT'])
     if df.shape != expectedSize:
-        print("ERROR: Size of dataset has changed! Expecting " +
-              str(expectedSize) + ", got " + str(df.shape) + '. Either fix ' +
-              'the import file or change the expected value in config.py')
+        raise ValueError("ERROR: Size of dataset has changed! Expecting " +
+                         str(expectedSize) + ", got " + str(df.shape) + '. ' +
+                         'Either fix the import file or change the expected ' +
+                         'value in config.py')
         sys.exit()
+    else:
+        report += ('Loaded ' + str(df.shape[0]) + ' rows and ' +
+                   str(df.shape[1]) + ' columns')
 
     # Make sure we have meta data for every imported column
 
     if (len(list(set(list(df)) - set(meta['fullColName'].tolist()))) > 0 or
             len(list(set(meta['fullColName'].tolist()) - set(list(df)))) > 0):
 
-        print()
-        print('WARNING: columns in imported data do not match columns in ' +
-              'meta data')
-        print()
-        print('*** outputting imported data columns not in meta data ' +
-              'columns to file dataColsMissingFromMeta.csv ***')
-        print()
         cols = list(set(list(df)) - set(meta['fullColName'].tolist()))
+
+        report += ('WARNING: columns in imported data do not match columns ' +
+                   'in meta data\n\n')
+        report += (' - Outputting imported data columns not in meta data ' +
+                   'to file dataColsMissingFromMeta.csv ***\n')
+        report += (' - Outputting meta data columns not in imported dataset ' +
+                   'to file metaColsMissingFromData.csv ***\n')
+
         with open('dataColsMissingFromMeta.csv', 'w', newline='') as myfile:
             wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
             for col in cols:
                 wr.writerow([col, ])
-        print('*** outputting meta data columns not in imported data ' +
-              'columns to file metaColsMissingFromData.csv ***')
-        print()
+
         cols = list(set(meta['fullColName'].tolist()) - set(list(df)))
         with open('metaColsMissingFromData.csv', 'w', newline='') as myfile:
             wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
             for col in cols:
                 wr.writerow([col, ])
-        print()
+
+    logFunctionEnd(report)
 
     return df
 
-# A temporary function to check a bunch of non-meta dataed columsn were empty
-# def checkEmptyColsAreEmpty(df, meta):
-#     allOK = True
-#     for colName in meta.loc[meta['IN SCOPE'] == '?', 'fullColName'].tolist():
-#         nonNullVals = df.loc[df[colName].notnull(), colName].tolist()
-#         if len(nonNullVals) > 0:
-#             allOK = False
-#             print("|" + colName + "| >> meta data is not populated, but " +
-#                   "the column " +
-#                   "in the data export is not empty. It contains: ")
-#             print()
-#             print('------')
-#             print(nonNullVals)
-#             print('------')
-#             print()
-#     if allOK:
-#         print('All ok')
-
 
 def filterToInscopeColumns(df, meta):
+
+    funcName = 'Filtering to In Scope Columns'
+    logFunctionStart(funcName)
 
     # Our meta data has a "IN SCOPE" column, T or F
     inScopeCols = meta.loc[meta['IN SCOPE'] == 'T', 'fullColName']
     df = df[list(inScopeCols)]
 
+    logFunctionEnd()
+
     return df
 
 
 def deleteTestData(df):
+
+    funcName = 'Deleting Test Data'
+    logFunctionStart(funcName)
+    report = ''
+
+    print('This will take a while...\n')
 
     df_testRows = df[
         df.apply(
@@ -227,14 +281,20 @@ def deleteTestData(df):
     df_merged = pd.merge(df, df_testRows, indicator=True, how='outer')
     df = df_merged.query('_merge=="left_only"').drop('_merge', axis=1)
 
-    print("Deleted " + str(df_testRows.shape[0]) +
-          " rows. See deleted_test_rows.csv")
+    report += ('Deleted ' + str(df_testRows.shape[0]) + ' rows. See ' +
+               'deleted_test_rows.csv')
+
     df_testRows.to_csv('deleted_test_rows.csv', index=False)
+
+    logFunctionEnd(report)
 
     return df
 
 
 def outputColumnsWithRepeatedData(df):
+
+    funcName = 'Saving Repeated Data as CSV'
+    logFunctionStart(funcName)
 
     _client = gspread.authorize(
         ServiceAccountCredentials.from_json_keyfile_name(
@@ -280,14 +340,25 @@ def outputColumnsWithRepeatedData(df):
 
         ws.update_cells(cell_list)
 
+    logFunctionEnd()
+
 
 def outputReligionData(df):
+
+    funcName = 'Saving Religion Data as CSV'
+    logFunctionStart(funcName)
+
     rels = pd.DataFrame(df['Are you a person of faith?'].unique()).dropna()
     rels.columns = ['VALUES']
     rels.to_csv('data/relgions_for_cleaning.csv', index=False)
 
+    logFunctionEnd()
+
 
 def cleanData(df, rels, repData):
+
+    funcName = 'Cleaning Data'
+    logFunctionStart(funcName)
 
     # Remove commas from ~12 last names
     df.loc[(df['Last Name'].str.contains(',', na=False)) &
@@ -373,10 +444,16 @@ def cleanData(df, rels, repData):
     colName = 'Organisational/company sign up:Name of Organisation'
     df.loc[df[colName].isin(["None", "Na"]), colName] = ''
 
+    logFunctionEnd()
+
     return df
 
 
 def outputMultiChoiceLists(df, meta):
+
+    funcName = 'Outputing multiple-choice lists'
+    logFunctionStart(funcName)
+
     customFields = list(meta.loc[
         meta['Custom Field Type?'] == 'Multiple Choice', 'fullColName'])
 
@@ -387,8 +464,14 @@ def outputMultiChoiceLists(df, meta):
                                  CONFIG['CUSTOM_FIELDS_DIRECTORY'] + '/' +
                                  col + '.csv', index=False)
 
+    logFunctionEnd()
+
 
 def processTags(df, meta):
+
+    funcName = 'Processing Tags'
+    logFunctionStart(funcName)
+
     df_tagMapping = meta.loc[(meta['Tag?'] == 'T') & (meta['IN SCOPE'] == 'T'),
                              ['fullColName', 'Tag Name']]
     tagMapping = df_tagMapping.set_index('fullColName')['Tag Name'].to_dict()
@@ -412,13 +495,20 @@ def processTags(df, meta):
 
     df['tags'] = df['tags'].apply(lambda x: ','.join(map(str, x)))
 
+    logFunctionEnd()
+
     return df
 
 
 def mapColumns(df, stm):
 
+    funcName = 'Mapping and Merging Columns'
+    logFunctionStart(funcName)
+    report = ''
+
     targetColsAlreadyCreated = []
-    mergedColsToDrop = []
+
+    emailColName = 'Email'
 
     for i, stmRow in stm.iterrows():
 
@@ -436,9 +526,9 @@ def mapColumns(df, stm):
                 fromCol = stmRow['fullColName']
                 toCol = stmRow['NB TARGET FIELD']
 
-                print('')
-                print('Mapping column: ' + str(fromCol))
-                print('To: ' + str(toCol))
+                print('\n', end='')
+                print('Mapping column: ' + str(fromCol) + '\n', end='')
+                print('To: ' + str(toCol) + '\n', end='')
 
                 # Some source columns have been mapped to the same target
                 # columns. These columns need merging. The rest just get
@@ -452,6 +542,9 @@ def mapColumns(df, stm):
 
                     targetColsAlreadyCreated.append(toCol)
 
+                    if fromCol == 'Email':
+                        emailColName = toCol
+
                 else:
 
                     # The first occurence of this toCol target column
@@ -460,7 +553,8 @@ def mapColumns(df, stm):
                     # occurences need to be merged to the existing toCol
                     # and the fromCol dropped
 
-                    print('Target column already exists, merging')
+                    print(' - We have already mapped a column to ' +
+                          toCol + ', so merge...' + '\n', end='')
 
                     # Whether our merge requires a concatenation depends on
                     # the two values, so we have to loop through all rows.
@@ -494,10 +588,13 @@ def mapColumns(df, stm):
                             else:
                                 numberOfConcatentations += 1
                                 newVal = str(toVal) + ', ' + str(fromVal)
-                                print('Values in both cols, concatenating...')
-                                print('  - ' + str(toVal))
-                                print('  - ' + str(fromVal))
-                                print('  = ' + newVal)
+                                emailOfConcatRow = df.at[j, emailColName]
+                                print('   - ' + emailOfConcatRow + ' ' +
+                                      'has values in both cols, ' +
+                                      'so concatenate...' + '\n', end='')
+                                print('      - Current value: ' + str(toVal) + '\n', end='')
+                                print('      - New value: ' + str(fromVal) + '\n', end='')
+                                print('      = Merged value: ' + newVal + '\n', end='')
 
                                 df.at[j, toCol] = newVal
 
@@ -507,16 +604,23 @@ def mapColumns(df, stm):
                         axis=1,
                         inplace=True)
 
+    logFunctionEnd(report)
+
     return df
 
 
 def outputData(df):
+    funcName = 'outputData'
+    logFunctionStart(funcName)
+    report = ''
 
     df.to_csv(CONFIG['DATA_DIRECTORY'] + '/' +
               CONFIG['OUTPUT_FILENAME'], index=False)
     df.head(10000).to_csv(CONFIG['DATA_DIRECTORY'] + '/' + 'subset_' +
                           CONFIG['OUTPUT_FILENAME'], index=False)
-    print("Saved data to " + CONFIG['OUTPUT_FILENAME'])
+    report += ("Saved data to " + CONFIG['OUTPUT_FILENAME'])
+
+    logFunctionEnd(report)
 
 
 def run(args):
@@ -537,7 +641,7 @@ def run(args):
 
     df = filterToInscopeColumns(df, meta)
 
-    # df = deleteTestData(df)
+    df = deleteTestData(df)
 
     # If you uncomment this, it will overwrite the repeated-values spreadsheet,
     # which you probably don't want to do, given that JCF have already manually
