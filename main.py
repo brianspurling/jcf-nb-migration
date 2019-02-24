@@ -254,12 +254,17 @@ def filterToInscopeColumns(df, meta):
 
     funcName = 'Filtering to In Scope Columns'
     logFunctionStart(funcName)
+    report = ''
+
+    report += 'Reduced dataset from ' + str(df.shape[1]) + ' columns to '
 
     # Our meta data has a "IN SCOPE" column, T or F
     inScopeCols = meta.loc[meta['IN SCOPE'] == 'T', 'fullColName']
     df = df[list(inScopeCols)]
 
-    logFunctionEnd()
+    report += str(df.shape[1]) + ' columns (where IN SCOPE column of STM is T)'
+
+    logFunctionEnd(report)
 
     return df
 
@@ -359,6 +364,8 @@ def cleanData(df, rels, repData):
 
     funcName = 'Cleaning Data'
     logFunctionStart(funcName)
+
+    print('This will take a while...\n')
 
     # Remove commas from ~12 last names
     df.loc[(df['Last Name'].str.contains(',', na=False)) &
@@ -505,6 +512,10 @@ def mapColumns(df, stm):
     funcName = 'Mapping and Merging Columns'
     logFunctionStart(funcName)
     report = ''
+
+    print('This function will output every mapped column, and detail ' +
+          'and merging and concatenating that takes place. Scroll through ' +
+          'loooong output and check you are happy with the concatenations\n')
 
     targetColsAlreadyCreated = []
 
