@@ -415,89 +415,97 @@ def processTags(df, meta):
     return df
 
 
-def mapColumns(df, meta):
+def mapColumns(df, stm):
 
-    print()
+    targetColsAlreadyCreated = []
+    mergedColsToDrop = []
 
-    mapping = {}
-    reverseMapping = {}
-    colsToDrop = []
-    for i, row in meta.iterrows():
-        if row['IN SCOPE'] == 'T':
-            mappedValue = row['NB TARGET FIELD']
-            if row['NB TARGET FIELD'] is np.nan:
-                mappedValue = 'NOT MAPPED - ' + str(i)
+    for i, stmRow in stm.iterrows():
 
-            # Some source columns have been mapped to the same target columns.
-            # These columns need merging
-            if mappedValue in reverseMapping:
-                totalMergedValues = 0
-                op = ''
-                existingColName = reverseMapping[mappedValue]
-                newColName = row['fullColName']
-                op += ('Merging columns >>> ' +
-                       '\n  - ' + existingColName +
-                       '\n  - ' + newColName +
-                       '\nInto >>> ' +
-                       '\n  - ' + mappedValue + '\n')
-                df[existingColName] = df[existingColName].fillna('')
-                df[newColName] = df[newColName].fillna('')
+        if stmRow['IN SCOPE'] == 'T':
 
-                examplePrinted = False
+            if ((stmRow['NB TARGET FIELD'] is np.nan or
+                 stmRow['NB TARGET FIELD'] == '') and stmRow['Tag?'] != 'T'):
+                raise ValueError('Column not mapped: ' + stmRow['fullColName'])
 
-                for j, dfrow in df.iterrows():
+            # Some rows have no mapping because they are Tags only.
+            # Ignore these.
+            if (stmRow['NB TARGET FIELD'] is not np.nan and
+                    stmRow['NB TARGET FIELD'] != ''):
 
-                    doMerge = True
-                    # If the the two values are the same, don't merge
-                    if dfrow[existingColName] == dfrow[newColName]:
-                        doMerge = False
-                    # If the column we're mering in (newColName) is blank,
-                    # don't merge
-                    elif dfrow[newColName] == '':
-                        doMerge = False
+                fromCol = stmRow['fullColName']
+                toCol = stmRow['NB TARGET FIELD']
 
-                    if doMerge:
-                        if dfrow[existingColName] == '':
-                            dfrow[existingColName] = str(dfrow[newColName])
-                        else:
-                            totalMergedValues = totalMergedValues + 1
-                            dfrow[existingColName] = \
-                                str(dfrow[existingColName]) + \
-                                ', ' + \
-                                str(dfrow[newColName])
-                            if not examplePrinted:
-                                op += ('  - Example of merged value: ' +
-                                       str(dfrow[existingColName]) + '\n')
-                                examplePrinted = True
+                print('')
+                print('Mapping column: ' + str(fromCol))
+                print('To: ' + str(toCol))
 
-                if totalMergedValues > 0:
-                    op += ('  - merged ' + str(totalMergedValues) +
-                           ' rows in total\n\n')
+                # Some source columns have been mapped to the same target
+                # columns. These columns need merging. The rest just get
+                # renamed to the new column name
+                if toCol not in targetColsAlreadyCreated:
+
+                    df.rename(
+                        index=str,
+                        columns={fromCol: toCol},
+                        inplace=True)
+
+                    targetColsAlreadyCreated.append(toCol)
+
                 else:
-                    op += ('  - No merging needed\n\n')
 
-                colsToDrop.append(newColName)
+                    # The first occurence of this toCol target column
+                    # would have resulted in a normal mapping (i.e. the
+                    # fromCol was renamed to the toCol). Subsequent
+                    # occurences need to be merged to the existing toCol
+                    # and the fromCol dropped
 
-                if totalMergedValues > 0:
-                    print(op)
+                    print('Target column already exists, merging')
 
-            else:
-                mapping[row['fullColName']] = mappedValue
+                    # Whether our merge requires a concatenation depends on
+                    # the two values, so we have to loop through all rows.
+                    # This is slooow.
 
-            reverseMapping[mappedValue] = row['fullColName']
+                    numberOfConcatentations = 0
 
-    # Drop the columns we merged together
-    df.drop(
-        colsToDrop,
-        axis=1,
-        inplace=True)
+                    for j, dfRow in df.iterrows():
 
-    # And rename everything
+                        fromVal = dfRow[fromCol]
+                        toVal = dfRow[toCol]
 
-    df.rename(
-        index=str,
-        columns=mapping,
-        inplace=True)
+                        doMerge = True
+
+                        # If the the two values are the same, don't merge
+                        if fromVal == toVal:
+                            doMerge = False
+
+                        # If the value we're merging in (fromCol) is blank,
+                        # don't merge
+                        if fromVal is np.nan or fromVal == '':
+                            doMerge = False
+
+                        if doMerge:
+
+                            # If the target value is blank, don't concat
+                            if toVal is np.nan or toVal == '':
+                                df.at[j, toCol] = str(fromVal)
+
+                            # Otherwise, we're concatentating, so log the o/p
+                            else:
+                                numberOfConcatentations += 1
+                                newVal = str(toVal) + ', ' + str(fromVal)
+                                print('Values in both cols, concatenating...')
+                                print('  - ' + str(toVal))
+                                print('  - ' + str(fromVal))
+                                print('  = ' + newVal)
+
+                                df.at[j, toCol] = newVal
+
+                    # We've looped through all rows, so now drop the fromCol
+                    df.drop(
+                        fromCol,
+                        axis=1,
+                        inplace=True)
 
     return df
 
