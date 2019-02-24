@@ -290,7 +290,7 @@ def deleteTestData(df):
     report += ('Deleted ' + str(df_testRows.shape[0]) + ' rows. See ' +
                'deleted_test_rows.csv')
 
-    df_testRows.to_csv('deleted_test_rows.csv', index=False)
+    df_testRows.to_csv(CONFIG['DATA_DIRECTORY'] + '/' + 'deleted_test_rows.csv', index=False)
 
     logFunctionEnd(report)
 
