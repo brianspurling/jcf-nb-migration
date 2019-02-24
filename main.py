@@ -586,7 +586,7 @@ def mapColumns(df, stm):
 
                         # If the value we're merging in (fromCol) is blank,
                         # don't merge
-                        if fromVal is np.nan or fromVal == '':
+                        if fromVal is np.nan or fromVal == '' or fromVal == 'nan':
                             doMerge = False
 
                         if doMerge:
